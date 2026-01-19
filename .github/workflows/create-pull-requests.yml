@@ -46,7 +46,7 @@ jobs:
 
       - name: Create PRs
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN_PR }}
         run: |
           echo "$SERVICES" | jq -r '.[]' | while read repo; do
             echo "Creating PR for $repo"
@@ -64,7 +64,7 @@ jobs:
       - name: Auto-merge PRs (optional)
         if: env.AUTO_MERGE == 'true'
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN_PR }}
         run: |
           echo "$SERVICES" | jq -r '.[]' | while read repo; do
             echo "Attempting auto-merge for $repo"
