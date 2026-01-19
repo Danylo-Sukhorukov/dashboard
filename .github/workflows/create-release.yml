@@ -25,9 +25,9 @@ jobs:
       
           echo "Owner: $OWNER"
       
-          SHA=$(gh api "repos/$OWNER/service-a/git/ref/heads/$BASE" --jq .object.sha)
+          SHA=$(gh api "repos/$OWNER/service1/git/ref/heads/$BASE" --jq .object.sha)
       
-          gh api "repos/$OWNER/service-a/git/refs" \
+          gh api "repos/$OWNER/service1/git/refs" \
             -f ref="refs/heads/release/$RELEASE" \
             -f sha="$SHA"
 
