@@ -1,0 +1,19 @@
+name: Create release branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release name
+        required: true
+        type: string
+      base:
+        description: Base branch
+        default: main
+
+jobs:
+  dummy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo input
+        run: echo "Release = ${{ inputs.release }}"
