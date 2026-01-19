@@ -99,16 +99,31 @@ jobs:
 
           for repo in "${REPOS[@]}"; do
             repo="$(echo "$repo" | xargs)"
+            [ -z "$repo" ] && continue
 
-            if [ -z "$repo" ]; then
+            echo "---------------------------------------------"
+            echo "Looking for PR in $repo ($FROM → $TO)"
+
+            # Ищем PR
+            PR_NUMBER=$(gh pr list \
+              --repo "$repo" \
+              --base "$TO" \
+              --head "$FROM" \
+              --state open \
+              --json number \
+              --jq '.[0].number')
+
+            if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+              echo "No open PR found for $repo"
               continue
             fi
 
-            echo "Attempting auto-merge for $repo"
+            echo "Found PR #$PR_NUMBER — attempting auto-merge"
 
-            gh pr merge \
+            gh pr merge "$PR_NUMBER" \
               --repo "$repo" \
               --auto \
               --squash \
               || echo "Auto-merge not possible for $repo (checks/approvals pending)"
           done
+
