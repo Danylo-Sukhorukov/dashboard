@@ -2,6 +2,27 @@
 <html>
   <body style="font-family: sans-serif">
     <h1>Release Dashboard</h1>
-    <button>Create release</button>
+    <button onclick="createRelease()">Create release</button>
+
+<script>
+async function createRelease() {
+  await fetch(
+    "https://api.github.com/repos/Danylo-Sukhorukov/release-dashboard/actions/workflows/create-release.yml/dispatches",
+    {
+      method: "POST",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": "token <TEMP_PAT>"
+      },
+      body: JSON.stringify({
+        ref: "main",
+        inputs: {
+          release: "v1.0.1"
+        }
+      })
+    }
+  );
+}
+</script>
   </body>
 </html>
