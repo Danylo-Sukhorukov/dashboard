@@ -44,6 +44,11 @@ jobs:
           echo "SERVICES=${{ inputs.services }}" >> $GITHUB_ENV
           echo "AUTO_MERGE=${{ inputs.auto_merge }}" >> $GITHUB_ENV
 
+      - name: Debug SERVICES
+        run: |
+          echo "SERVICES raw:"
+          echo "$SERVICES"
+          
       - name: Create PRs
         env:
           GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN_PR }}
