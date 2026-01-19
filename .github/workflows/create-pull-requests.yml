@@ -1,0 +1,78 @@
+name: Promote branches (Create PRs)
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: Source branch (e.g. dev)
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - stage
+      to:
+        description: Target branch (e.g. test / stage / prod)
+        required: true
+        type: choice
+        options:
+          - test
+          - stage
+          - prod
+      services:
+        description: JSON array of repos (e.g. ["danylo-sukhorukov/service1"])
+        required: true
+      auto_merge:
+        description: Auto-merge PRs if possible
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-prs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Parse inputs
+        id: vars
+        run: |
+          echo "FROM=${{ inputs.from }}" >> $GITHUB_ENV
+          echo "TO=${{ inputs.to }}" >> $GITHUB_ENV
+          echo "SERVICES=${{ inputs.services }}" >> $GITHUB_ENV
+          echo "AUTO_MERGE=${{ inputs.auto_merge }}" >> $GITHUB_ENV
+
+      - name: Create PRs
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+        run: |
+          echo "$SERVICES" | jq -r '.[]' | while read repo; do
+            echo "Creating PR for $repo"
+
+            gh pr create \
+              --repo "$repo" \
+              --base "$TO" \
+              --head "$FROM" \
+              --title "Promote $FROM → $TO" \
+              --body "Automated promotion via release-dashboard" \
+              || echo "PR already exists for $repo"
+
+          done
+
+      - name: Auto-merge PRs (optional)
+        if: env.AUTO_MERGE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+        run: |
+          echo "$SERVICES" | jq -r '.[]' | while read repo; do
+            echo "Attempting auto-merge for $repo"
+
+            gh pr merge \
+              --repo "$repo" \
+              --auto \
+              --squash \
+              || echo "Auto-merge not possible for $repo"
+
+          done
