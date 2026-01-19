@@ -13,13 +13,13 @@
     }
 
     h1 {
-      margin-bottom: 30px;
+      margin-bottom: 24px;
     }
 
     table {
       border-collapse: collapse;
       width: 100%;
-      max-width: 1000px;
+      max-width: 900px;
     }
 
     th, td {
@@ -35,11 +35,6 @@
     tr:nth-child(even) {
       background: #fafafa;
     }
-
-    .status-success { color: #1a7f37; font-weight: 600; }
-    .status-pending { color: #9a6700; font-weight: 600; }
-    .status-error   { color: #cf222e; font-weight: 600; }
-    .status-unknown { color: #6e7781; }
 
     .muted {
       color: #6e7781;
@@ -65,14 +60,12 @@
     <tr>
       <th>Service</th>
       <th>Deployed branch</th>
-      <th>Deploy status</th>
-      <th>Deployed at</th>
-      <th>Page</th>
+      <th>Pages URL</th>
     </tr>
   </thead>
   <tbody id="services">
     <tr>
-      <td colspan="5" class="muted">Loading services…</td>
+      <td colspan="3" class="muted">Loading services…</td>
     </tr>
   </tbody>
 </table>
@@ -97,63 +90,34 @@ async function renderService(service) {
   row.innerHTML = `
     <td>${service.name}</td>
     <td class="muted">—</td>
-    <td class="status-unknown">Loading…</td>
-    <td class="muted">—</td>
     <td class="muted">—</td>
   `;
 
   tbody.appendChild(row);
 
-  const pages = await getPagesDeployment(service.repo);
+  const pages = await getPagesInfo(service.repo);
 
   if (!pages) {
-    row.children[2].textContent = 'No Pages';
+    row.children[1].textContent = 'Pages not enabled';
     return;
   }
 
-  const status = pages.status;
-  const branch = pages.deployment?.ref || '—';
-  const time = pages.created_at;
-  const url = pages.page_url;
+  const branch = pages.source?.branch || '—';
+  const url = pages.html_url || '—';
 
   row.children[1].textContent = branch;
-  row.children[2].innerHTML = renderStatus(status);
-  row.children[3].textContent = formatTime(time);
-  row.children[4].innerHTML = url
-    ? `<a href="${url}" target="_blank">open</a>`
-    : '—';
+  row.children[2].innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
 }
 
-async function getPagesDeployment(repo) {
+async function getPagesInfo(repo) {
   const [owner, name] = repo.split('/');
 
   const res = await fetch(
-    `https://api.github.com/repos/${owner}/${name}/pages/deployments`
+    `https://api.github.com/repos/${owner.toLowerCase()}/${name}/pages`
   );
 
   if (!res.ok) return null;
-
-  const deployments = await res.json();
-  return deployments[0]; 
-}
-
-function renderStatus(status) {
-  switch (status) {
-    case 'success':
-      return `<span class="status-success">🟢 deployed</span>`;
-    case 'pending':
-      return `<span class="status-pending">🟡 deploying</span>`;
-    case 'error':
-      return `<span class="status-error">🔴 failed</span>`;
-    default:
-      return `<span class="status-unknown">⚪ unknown</span>`;
-  }
-}
-
-function formatTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleString();
+  return await res.json();
 }
 
 loadServices();
