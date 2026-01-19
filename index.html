@@ -3,134 +3,161 @@
 <head>
   <meta charset="utf-8" />
   <title>Release Dashboard</title>
+
   <style>
     body {
-      font-family: sans-serif;
-      background: white;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #ffffff;
       padding: 40px;
+      color: #111;
     }
-    label, button {
-      display: block;
-      margin-top: 20px;
+
+    h1 {
+      margin-bottom: 30px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    th {
+      background: #f6f6f6;
+    }
+
+    tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    .status-success { color: #1a7f37; font-weight: 600; }
+    .status-pending { color: #9a6700; font-weight: 600; }
+    .status-error   { color: #cf222e; font-weight: 600; }
+    .status-unknown { color: #6e7781; }
+
+    .muted {
+      color: #6e7781;
+      font-size: 0.9em;
+    }
+
+    a {
+      color: #0969da;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
 
-<h1>Create release</h1>
+<h1>Release Dashboard</h1>
 
-<label>
-  Release date:
-  <input type="date" id="releaseDate" />
-</label>
-
-<button onclick="createRelease()">Create release</button>
-
-  <h2>Services</h2>
-
-<table border="1" cellpadding="8">
+<table>
   <thead>
     <tr>
       <th>Service</th>
-      <th>Branch</th>
-      <th>Commit</th>
-      <th>CI</th>
+      <th>Deployed branch</th>
+      <th>Deploy status</th>
+      <th>Deployed at</th>
+      <th>Page</th>
     </tr>
   </thead>
-  <tbody id="services"></tbody>
+  <tbody id="services">
+    <tr>
+      <td colspan="5" class="muted">Loading services…</td>
+    </tr>
+  </tbody>
 </table>
 
 <script>
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
-}
-
-async function createRelease() {
-  const dateInput = document.getElementById('releaseDate').value;
-  if (!dateInput) {
-    alert('Please select a date');
-    return;
-  }
-
-  const releaseName = formatDate(dateInput);
-
-  await fetch(
-    "https://api.github.com/repos/<OWNER>/release-dashboard/actions/workflows/create-release.yml/dispatches",
-    {
-      method: "POST",
-      headers: {
-        "Accept": "application/vnd.github+json",
-        "Authorization": "token <TEMP_PAT>"
-      },
-      body: JSON.stringify({
-        ref: "main",
-        inputs: {
-          release: releaseName
-        }
-      })
-    }
-  );
-
-  alert(`Release release/${releaseName} triggered`);
-}
-</script>
-
-  <script>
 async function loadServices() {
+  const tbody = document.getElementById('services');
+  tbody.innerHTML = '';
+
   const res = await fetch('./services.json');
   const services = await res.json();
 
-  for (const svc of services) {
-    await renderService(svc);
+  for (const service of services) {
+    await renderService(service);
   }
 }
 
 async function renderService(service) {
   const tbody = document.getElementById('services');
-
-  const [owner, repo] = service.repo.split('/');
-  const branch = service.deployBranch;
-
-  const branchRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/branches/${branch}`
-  );
-  const branchData = await branchRes.json();
-
-  const sha = branchData.commit.sha.slice(0, 7);
-
-  const statusRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/commits/${branchData.commit.sha}/status`
-  );
-  const statusData = await statusRes.json();
-
-  const state = statusData.state;
-
   const row = document.createElement('tr');
+
   row.innerHTML = `
     <td>${service.name}</td>
-    <td>${branch}</td>
-    <td>${sha}</td>
-    <td>${renderStatus(state)}</td>
+    <td class="muted">—</td>
+    <td class="status-unknown">Loading…</td>
+    <td class="muted">—</td>
+    <td class="muted">—</td>
   `;
+
   tbody.appendChild(row);
+
+  const pages = await getPagesDeployment(service.repo);
+
+  if (!pages) {
+    row.children[2].textContent = 'No Pages';
+    return;
+  }
+
+  const status = pages.status;
+  const branch = pages.deployment?.ref || '—';
+  const time = pages.created_at;
+  const url = pages.page_url;
+
+  row.children[1].textContent = branch;
+  row.children[2].innerHTML = renderStatus(status);
+  row.children[3].textContent = formatTime(time);
+  row.children[4].innerHTML = url
+    ? `<a href="${url}" target="_blank">open</a>`
+    : '—';
 }
 
-function renderStatus(state) {
-  switch (state) {
-    case 'success': return 'success';
-    case 'pending': return 'running';
-    case 'failure': return 'failed';
-    default: return 'unknown';
+async function getPagesDeployment(repo) {
+  const [owner, name] = repo.split('/');
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${name}/pages/deployments`
+  );
+
+  if (!res.ok) return null;
+
+  const deployments = await res.json();
+  return deployments[0]; 
+}
+
+function renderStatus(status) {
+  switch (status) {
+    case 'success':
+      return `<span class="status-success">🟢 deployed</span>`;
+    case 'pending':
+      return `<span class="status-pending">🟡 deploying</span>`;
+    case 'error':
+      return `<span class="status-error">🔴 failed</span>`;
+    default:
+      return `<span class="status-unknown">⚪ unknown</span>`;
   }
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString();
 }
 
 loadServices();
 </script>
-
 
 </body>
 </html>
