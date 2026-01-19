@@ -1,13 +1,51 @@
 <!doctype html>
-<html>
-  <body style="font-family: sans-serif">
-    <h1>Release Dashboard</h1>
-    <button onclick="createRelease()">Create release</button>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Release Dashboard</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: white;
+      padding: 40px;
+    }
+    label, button {
+      display: block;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Create release</h1>
+
+<label>
+  Release date:
+  <input type="date" id="releaseDate" />
+</label>
+
+<button onclick="createRelease()">Create release</button>
 
 <script>
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
 async function createRelease() {
+  const dateInput = document.getElementById('releaseDate').value;
+  if (!dateInput) {
+    alert('Please select a date');
+    return;
+  }
+
+  const releaseName = formatDate(dateInput);
+
   await fetch(
-    "https://api.github.com/repos/Danylo-Sukhorukov/release-dashboard/actions/workflows/create-release.yml/dispatches",
+    "https://api.github.com/repos/<OWNER>/release-dashboard/actions/workflows/create-release.yml/dispatches",
     {
       method: "POST",
       headers: {
@@ -17,12 +55,15 @@ async function createRelease() {
       body: JSON.stringify({
         ref: "main",
         inputs: {
-          release: "v1.0.1"
+          release: releaseName
         }
       })
     }
   );
+
+  alert(`Release release/${releaseName} triggered`);
 }
 </script>
-  </body>
+
+</body>
 </html>
