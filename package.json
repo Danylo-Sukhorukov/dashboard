@@ -1,0 +1,9 @@
+{
+  "name": "release-backend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2"
+  }
+}
