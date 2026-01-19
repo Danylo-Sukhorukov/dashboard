@@ -65,62 +65,40 @@
   </thead>
   <tbody id="services">
     <tr>
-      <td colspan="3" class="muted">Loading services…</td>
+      <td colspan="3" class="muted">Loading…</td>
     </tr>
   </tbody>
 </table>
 
 <script>
-async function loadServices() {
+async function loadDashboard() {
   const tbody = document.getElementById('services');
   tbody.innerHTML = '';
 
-  const res = await fetch('./services.json');
-  const services = await res.json();
+  const services = await fetch('./services.json').then(r => r.json());
+  const pages = await fetch('./pages-status.json').then(r => r.json());
 
   for (const service of services) {
-    await renderService(service);
+    const row = document.createElement('tr');
+
+    const branch = pages?.source?.branch ?? '—';
+    const url = pages?.html_url ?? '—';
+
+    row.innerHTML = `
+      <td>${service.name}</td>
+      <td>${branch}</td>
+      <td>
+        ${url !== '—'
+          ? `<a href="${url}" target="_blank">open</a>`
+          : '—'}
+      </td>
+    `;
+
+    tbody.appendChild(row);
   }
 }
 
-async function renderService(service) {
-  const tbody = document.getElementById('services');
-  const row = document.createElement('tr');
-
-  row.innerHTML = `
-    <td>${service.name}</td>
-    <td class="muted">—</td>
-    <td class="muted">—</td>
-  `;
-
-  tbody.appendChild(row);
-
-  const pages = await getPagesInfo(service.repo);
-
-  if (!pages) {
-    row.children[1].textContent = 'Pages not enabled';
-    return;
-  }
-
-  const branch = pages.source?.branch || '—';
-  const url = pages.html_url || '—';
-
-  row.children[1].textContent = branch;
-  row.children[2].innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
-}
-
-async function getPagesInfo(repo) {
-  const [owner, name] = repo.split('/');
-
-  const res = await fetch(
-    `https://api.github.com/repos/${owner.toLowerCase()}/${name}/pages`
-  );
-
-  if (!res.ok) return null;
-  return await res.json();
-}
-
-loadServices();
+loadDashboard();
 </script>
 
 </body>
