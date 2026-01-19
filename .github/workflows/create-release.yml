@@ -19,6 +19,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api repos/<org>/service-a/git/refs \
+          gh api repos/danylo-sukhorukov/service-a/git/refs \
             -f ref=refs/heads/release/${{ inputs.release }} \
-            -f sha=$(gh api repos/<org>/service-a/git/ref/heads/main --jq .object.sha)
+            -f sha=$(gh api repos/danylo-sukhorukov/service-a/git/ref/heads/main --jq .object.sha)
