@@ -26,6 +26,20 @@
 
 <button onclick="createRelease()">Create release</button>
 
+  <h2>Services</h2>
+
+<table border="1" cellpadding="8">
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>Branch</th>
+      <th>Commit</th>
+      <th>CI</th>
+    </tr>
+  </thead>
+  <tbody id="services"></tbody>
+</table>
+
 <script>
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -64,6 +78,59 @@ async function createRelease() {
   alert(`Release release/${releaseName} triggered`);
 }
 </script>
+
+  <script>
+async function loadServices() {
+  const res = await fetch('./services.json');
+  const services = await res.json();
+
+  for (const svc of services) {
+    await renderService(svc);
+  }
+}
+
+async function renderService(service) {
+  const tbody = document.getElementById('services');
+
+  const [owner, repo] = service.repo.split('/');
+  const branch = service.deployBranch;
+
+  const branchRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/branches/${branch}`
+  );
+  const branchData = await branchRes.json();
+
+  const sha = branchData.commit.sha.slice(0, 7);
+
+  const statusRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${branchData.commit.sha}/status`
+  );
+  const statusData = await statusRes.json();
+
+  const state = statusData.state;
+
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>${service.name}</td>
+    <td>${branch}</td>
+    <td>${sha}</td>
+    <td>${renderStatus(state)}</td>
+  `;
+  tbody.appendChild(row);
+}
+
+function renderStatus(state) {
+  switch (state) {
+    case 'success': return 'success';
+    case 'pending': return 'running';
+    case 'failure': return 'failed';
+    default: return 'unknown';
+  }
+}
+
+loadServices();
+</script>
+
 
 </body>
 </html>
