@@ -26,6 +26,10 @@
       margin: 8px 0;
     }
 
+    select, input[type="date"] {
+      margin-left: 8px;
+    }
+
     button {
       margin-top: 16px;
       padding: 8px 14px;
@@ -56,6 +60,7 @@
     .muted {
       color: #6e7781;
       font-size: 0.9em;
+      margin-left: 6px;
     }
 
     .box {
@@ -86,6 +91,24 @@
 
 <section>
   <h2>Create release</h2>
+
+  <label>
+    From branch:
+    <select id="fromBranch" onchange="onBranchesChanged()">
+      <option value="dev">dev</option>
+      <option value="test">test</option>
+      <option value="stage">stage</option>
+    </select>
+  </label>
+
+  <label>
+    To branch:
+    <select id="toBranch" onchange="onBranchesChanged()">
+      <option value="test">test</option>
+      <option value="stage">stage</option>
+      <option value="prod">prod</option>
+    </select>
+  </label>
 
   <label>
     Release date:
@@ -128,30 +151,83 @@
 <script>
 let services = [];
 
+/* ================= INIT ================= */
+
 async function init() {
   services = await fetch('./services.json').then(r => r.json());
   renderToggles();
   loadDashboard();
 
-  // default date = today
   document.getElementById('releaseDate').value =
     new Date().toISOString().split('T')[0];
+
+  onBranchesChanged();
 }
+
+/* ================= TOGGLES ================= */
 
 function renderToggles() {
   const container = document.getElementById('serviceToggles');
   container.innerHTML = '<strong>Services:</strong>';
 
   services.forEach((svc, i) => {
-    const id = `svc_${i}`;
     container.innerHTML += `
       <label>
-        <input type="checkbox" id="${id}" checked />
+        <input type="checkbox" id="svc_${i}" disabled />
         ${svc.name}
+        <span id="svc_${i}_status" class="muted"></span>
       </label>
     `;
   });
 }
+
+/* ================= COMPARE ================= */
+
+async function compareBranches(repo, base, head) {
+  const [owner, name] = repo.split('/');
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${name}/compare/${base}...${head}`
+  );
+
+  if (!res.ok) {
+    return { error: true };
+  }
+
+  return await res.json();
+}
+
+async function onBranchesChanged() {
+  const from = document.getElementById('fromBranch').value;
+  const to = document.getElementById('toBranch').value;
+
+  for (let i = 0; i < services.length; i++) {
+    const svc = services[i];
+    const checkbox = document.getElementById(`svc_${i}`);
+    const status = document.getElementById(`svc_${i}_status`);
+
+    checkbox.checked = false;
+    checkbox.disabled = true;
+    status.textContent = ' checking…';
+
+    const result = await compareBranches(svc.repo, to, from);
+
+    if (result.error) {
+      status.textContent = ' error';
+      continue;
+    }
+
+    if (result.total_commits > 0) {
+      checkbox.disabled = false;
+      checkbox.checked = true;
+      status.textContent = ` +${result.total_commits} commits`;
+    } else {
+      status.textContent = ' up to date';
+    }
+  }
+}
+
+/* ================= RELEASE PREVIEW ================= */
 
 function buildRelease() {
   const date = document.getElementById('releaseDate').value;
@@ -171,11 +247,6 @@ function buildRelease() {
     document.getElementById(`svc_${i}`).checked
   );
 
-  const preview = {
-    release: releaseName,
-    services: selected.map(s => s.repo)
-  };
-
   const box = document.getElementById('releasePreview');
   box.style.display = 'block';
   box.textContent =
@@ -183,14 +254,14 @@ function buildRelease() {
 ${releaseName}
 
 Services:
-${preview.services.map(s => '- ' + s).join('\n')}
+${selected.map(s => '- ' + s.repo).join('\n')}
 
 Next step:
 GitHub Actions → Create release branches
 `;
 }
 
-// ================= DEPLOY STATUS =================
+/* ================= DEPLOY STATUS ================= */
 
 async function loadDashboard() {
   const tbody = document.getElementById('services');
@@ -205,9 +276,7 @@ async function loadDashboard() {
       <td>${service.name}</td>
       <td>${pages?.source?.branch || '—'}</td>
       <td>
-        <a href="${pages?.html_url}" target="_blank">
-          open
-        </a>
+        <a href="${pages?.html_url}" target="_blank">open</a>
       </td>
     `;
 
