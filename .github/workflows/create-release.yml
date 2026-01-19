@@ -15,17 +15,20 @@ jobs:
   create:
     runs-on: ubuntu-latest
     steps:
-      - name: Create branch
-        env:
+     - name: Create branch
+       env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          OWNER=${{ github.repository_owner }}
+       run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           BASE=${{ inputs.base }}
           RELEASE=${{ inputs.release }}
-
+      
+          echo "Owner: $OWNER"
+      
           SHA=$(gh api "repos/$OWNER/service-a/git/ref/heads/$BASE" --jq .object.sha)
-
+      
           gh api "repos/$OWNER/service-a/git/refs" \
             -f ref="refs/heads/release/$RELEASE" \
             -f sha="$SHA"
+
 
