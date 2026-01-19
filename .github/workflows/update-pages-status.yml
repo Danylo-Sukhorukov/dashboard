@@ -1,0 +1,29 @@
+name: Update Pages status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *" # каждые 5 минут
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Pages info
+        env:
+          GH_TOKEN: ${{ secrets.PAGES_READ_TOKEN }}
+        run: |
+          OWNER="danylo-sukhorukov"
+          REPO="service1"
+
+          gh api "repos/$OWNER/$REPO/pages" > pages-status.json
+
+      - name: Commit status
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add pages-status.json
+          git commit -m "Update pages status" || echo "No changes"
+          git push
