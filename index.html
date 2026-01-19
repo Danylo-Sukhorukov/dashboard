@@ -12,8 +12,25 @@
       color: #111;
     }
 
-    h1 {
-      margin-bottom: 24px;
+    h1, h2 {
+      margin-bottom: 16px;
+    }
+
+    section {
+      margin-bottom: 40px;
+      max-width: 900px;
+    }
+
+    label {
+      display: block;
+      margin: 8px 0;
+    }
+
+    button {
+      margin-top: 16px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
     }
 
     table {
@@ -41,6 +58,16 @@
       font-size: 0.9em;
     }
 
+    .box {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      padding: 12px;
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre;
+    }
+
     a {
       color: #0969da;
       text-decoration: none;
@@ -55,42 +82,132 @@
 
 <h1>Release Dashboard</h1>
 
-<table>
-  <thead>
-    <tr>
-      <th>Service</th>
-      <th>Deployed branch</th>
-      <th>Pages URL</th>
-    </tr>
-  </thead>
-  <tbody id="services">
-    <tr>
-      <td colspan="3" class="muted">Loading…</td>
-    </tr>
-  </tbody>
-</table>
+<!-- ================= RELEASE CREATOR ================= -->
+
+<section>
+  <h2>Create release</h2>
+
+  <label>
+    Release date:
+    <input type="date" id="releaseDate" />
+  </label>
+
+  <div id="serviceToggles"></div>
+
+  <button onclick="buildRelease()">Prepare release</button>
+
+  <div id="releasePreview" class="box" style="display:none;"></div>
+
+  <p class="muted">
+    ⚠️ Branch creation is done via GitHub Actions (manual run).<br>
+    This UI prepares the release configuration.
+  </p>
+</section>
+
+<!-- ================= SERVICES TABLE ================= -->
+
+<section>
+  <h2>Deployed services</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th>Deployed branch</th>
+        <th>Pages URL</th>
+      </tr>
+    </thead>
+    <tbody id="services">
+      <tr>
+        <td colspan="3" class="muted">Loading…</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
 
 <script>
+let services = [];
+
+async function init() {
+  services = await fetch('./services.json').then(r => r.json());
+  renderToggles();
+  loadDashboard();
+
+  // default date = today
+  document.getElementById('releaseDate').value =
+    new Date().toISOString().split('T')[0];
+}
+
+function renderToggles() {
+  const container = document.getElementById('serviceToggles');
+  container.innerHTML = '<strong>Services:</strong>';
+
+  services.forEach((svc, i) => {
+    const id = `svc_${i}`;
+    container.innerHTML += `
+      <label>
+        <input type="checkbox" id="${id}" checked />
+        ${svc.name}
+      </label>
+    `;
+  });
+}
+
+function buildRelease() {
+  const date = document.getElementById('releaseDate').value;
+  if (!date) {
+    alert('Select release date');
+    return;
+  }
+
+  const d = new Date(date);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+
+  const releaseName = `release/${dd}-${mm}-${yyyy}`;
+
+  const selected = services.filter((_, i) =>
+    document.getElementById(`svc_${i}`).checked
+  );
+
+  const preview = {
+    release: releaseName,
+    services: selected.map(s => s.repo)
+  };
+
+  const box = document.getElementById('releasePreview');
+  box.style.display = 'block';
+  box.textContent =
+`Release branch:
+${releaseName}
+
+Services:
+${preview.services.map(s => '- ' + s).join('\n')}
+
+Next step:
+GitHub Actions → Create release branches
+`;
+}
+
+// ================= DEPLOY STATUS =================
+
 async function loadDashboard() {
   const tbody = document.getElementById('services');
   tbody.innerHTML = '';
 
-  const services = await fetch('./services.json').then(r => r.json());
   const pages = await fetch('./pages-status.json').then(r => r.json());
 
   for (const service of services) {
     const row = document.createElement('tr');
 
-    const branch = pages?.source?.branch ?? '—';
-    const url = pages?.html_url ?? '—';
-
     row.innerHTML = `
       <td>${service.name}</td>
-      <td>${branch}</td>
+      <td>${pages?.source?.branch || '—'}</td>
       <td>
-        ${url !== '—'
-          ? `<a href="${url}" target="_blank">open</a>`
-          : '—'}
+        <a href="${pages?.html_url}" target="_blank">
+          open
+        </a>
       </td>
     `;
 
@@ -98,7 +215,7 @@ async function loadDashboard() {
   }
 }
 
-loadDashboard();
+init();
 </script>
 
 </body>
