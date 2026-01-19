@@ -4,26 +4,31 @@ on:
   workflow_dispatch:
     inputs:
       from:
-        description: Source branch (e.g. dev)
+        description: Source branch (dev / test / stage)
         required: true
         type: choice
         options:
           - dev
           - test
           - stage
+
       to:
-        description: Target branch (e.g. test / stage / prod)
+        description: Target branch (test / stage / prod)
         required: true
         type: choice
         options:
           - test
           - stage
           - prod
+
       services:
-        description: Comma-separated repos (owner/repo)
+        description: >
+          Comma-separated repositories (owner/repo).
+          Example: danylo-sukhorukov/service1,danylo-sukhorukov/service2
         required: true
+
       auto_merge:
-        description: Auto-merge PRs if possible
+        description: Auto-merge PRs if possible (true / false)
         required: false
         default: "false"
 
@@ -36,27 +41,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Parse inputs
-        id: vars
+      - name: Show inputs (debug)
         run: |
-          echo "FROM=${{ inputs.from }}" >> $GITHUB_ENV
-          echo "TO=${{ inputs.to }}" >> $GITHUB_ENV
-          echo "SERVICES=${{ inputs.services }}" >> $GITHUB_ENV
-          echo "AUTO_MERGE=${{ inputs.auto_merge }}" >> $GITHUB_ENV
+          echo "FROM = ${{ inputs.from }}"
+          echo "TO = ${{ inputs.to }}"
+          echo "SERVICES = ${{ inputs.services }}"
+          echo "AUTO_MERGE = ${{ inputs.auto_merge }}"
 
-      - name: Debug SERVICES
-        run: |
-          echo "SERVICES raw:"
-          echo "$SERVICES"
-          
-      - name: Create PRs
+      - name: Create Pull Requests
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN_PR }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          SERVICES: ${{ inputs.services }}
         run: |
-          echo "$SERVICES" | tr ',' '\n' | while read repo; do
-          echo "Repo: $repo"
-          done
+          set -e
 
+          echo "Starting PR creation: $FROM → $TO"
+          echo "Services: $SERVICES"
+          echo
+
+          # Разбиваем CSV в массив
+          IFS=',' read -ra REPOS <<< "$SERVICES"
+
+          for repo in "${REPOS[@]}"; do
+            repo="$(echo "$repo" | xargs)"
+
+            if [ -z "$repo" ]; then
+              echo "Skipping empty repo entry"
+              continue
+            fi
+
+            echo "--------------------------------------------------"
             echo "Creating PR for $repo"
 
             gh pr create \
@@ -65,22 +81,34 @@ jobs:
               --head "$FROM" \
               --title "Promote $FROM → $TO" \
               --body "Automated promotion via release-dashboard" \
-              || echo "PR already exists for $repo"
-
+              || echo "PR already exists or cannot be created for $repo"
           done
 
-      - name: Auto-merge PRs (optional)
-        if: env.AUTO_MERGE == 'true'
+      - name: Auto-merge Pull Requests (optional)
+        if: inputs.auto_merge == 'true'
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN_PR }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          SERVICES: ${{ inputs.services }}
         run: |
-          echo "$SERVICES" | tr ',' '\n' | while read repo; do
+          set -e
+
+          echo "Auto-merge enabled"
+          IFS=',' read -ra REPOS <<< "$SERVICES"
+
+          for repo in "${REPOS[@]}"; do
+            repo="$(echo "$repo" | xargs)"
+
+            if [ -z "$repo" ]; then
+              continue
+            fi
+
             echo "Attempting auto-merge for $repo"
 
             gh pr merge \
               --repo "$repo" \
               --auto \
               --squash \
-              || echo "Auto-merge not possible for $repo"
-
+              || echo "Auto-merge not possible for $repo (checks/approvals pending)"
           done
