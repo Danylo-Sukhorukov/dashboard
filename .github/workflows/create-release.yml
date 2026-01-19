@@ -17,13 +17,11 @@ jobs:
     steps:
      - name: Create branch
        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
        run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           BASE=${{ inputs.base }}
           RELEASE=${{ inputs.release }}
-      
-          echo "Owner: $OWNER"
       
           SHA=$(gh api "repos/$OWNER/service1/git/ref/heads/$BASE" --jq .object.sha)
       
