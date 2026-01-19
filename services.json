@@ -1,6 +1,7 @@
 [
   {
     "name": "service1",
-    "repo": "Danylo-Sukhorukov/service1"
+    "repo": "Danylo-Sukhorukov/service1",
+    "deployBranch": "main"
   }
 ]
