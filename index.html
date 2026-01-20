@@ -1,7 +1,7 @@
-<!doctype html>
-<html lang="ru">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <title>Release Dashboard</title>
 
   <style>
@@ -111,9 +111,7 @@
   </label>
 
   <div id="serviceToggles"></div>
-
-  <div id="finalString"></div>
-
+  <div id="finalString" style="margin-top: 12px;"></div>
 </section>
 
 <!-- ================= SERVICES TABLE ================= -->
@@ -138,18 +136,18 @@
 </section>
 
 <script>
+/* ================= STATE ================= */
+
 let services = [];
+let servicesWithChanges = [];
 
 /* ================= INIT ================= */
 
 async function init() {
   services = await fetch('./services.json').then(r => r.json());
+
   renderToggles();
   loadDashboard();
-
-  document.getElementById('releaseDate').value =
-    new Date().toISOString().split('T')[0];
-
   onBranchesChanged();
 }
 
@@ -193,125 +191,54 @@ async function compareBranches(repo, base, head) {
   );
 
   if (!res.ok) {
+    console.error('GitHub compare error:', repo, base, head, await res.text());
     return { error: true };
   }
 
   return await res.json();
 }
 
-// async function onBranchesChanged() {
-//   const from = document.getElementById('fromBranch').value;
-//   const to = document.getElementById('toBranch').value;
+/* ================= BRANCH CHANGE ================= */
 
-//   for (let i = 0; i < services.length; i++) {
-//     const svc = services[i];
-//     const checkbox = document.getElementById(`svc_${i}`);
-//     const status = document.getElementById(`svc_${i}_status`);
-
-//     checkbox.checked = false;
-//     checkbox.disabled = true;
-//     status.textContent = ' checking…';
-
-//     const result = await compareBranches(svc.repo, to, from);
-
-//     if (result.error) {
-//       status.textContent = ' error';
-//       continue;
-//     }
-
-//     if (result.total_commits > 0) {
-//       checkbox.disabled = false;
-//       checkbox.checked = true;
-//       status.textContent = ` +${result.total_commits} commits`;
-//     } else {
-//       status.textContent = ' up to date';
-//     }
-//   }
-// }
-
-  async function onBranchesChanged() {
+async function onBranchesChanged() {
   const from = document.getElementById('fromBranch').value;
   const to = document.getElementById('toBranch').value;
 
   servicesWithChanges = [];
 
-  for (let i = 0; i < services.length; i++) {
-    const svc = services[i];
-    const checkbox = document.getElementById(`svc_${i}`);
-    const status = document.getElementById(`svc_${i}_status`);
+  await Promise.all(
+    services.map(async (svc, i) => {
+      const checkbox = document.getElementById(`svc_${i}`);
+      const status = document.getElementById(`svc_${i}_status`);
 
-    checkbox.checked = false;
-    checkbox.disabled = true;
-    status.textContent = ' checking…';
+      checkbox.checked = false;
+      checkbox.disabled = true;
+      status.textContent = ' checking…';
 
-    const result = await compareBranches(svc.repo, to, from);
+      const result = await compareBranches(svc.repo, to, from);
 
-    if (result.error) {
-      status.textContent = ' error';
-      continue;
-    }
+      if (result.error) {
+        status.textContent = ' error';
+        return;
+      }
 
-    // const hasCodeDiff = result.files && result.files.length > 0;
+      const filesChanged = result.files?.length || 0;
 
-    // if (hasCodeDiff) {
-    //   checkbox.disabled = false;
-    //   checkbox.checked = true;
-    //   status.textContent = ` code changed`;
-
-    //   servicesWithChanges.push(svc.name); // ← ВАЖНО
-    // } else {
-    //   status.textContent = ' up to date';
-    // }
-
-    if (result.total_commits > 0) {
-      checkbox.disabled = false;
-      checkbox.checked = true;
-      status.textContent = ` +${result.total_commits} commits`;
-      
-      servicesWithChanges.push(svc.repo); 
-    } else {
-      status.textContent = ' up to date';
-    }
-  }
+      if (filesChanged > 0) {
+        checkbox.disabled = false;
+        checkbox.checked = true;
+        status.textContent = ` ${filesChanged} files changed`;
+        servicesWithChanges.push(svc.name);
+      } else {
+        status.textContent = ' up to date';
+      }
+    })
+  );
 
   renderFinalString();
 }
 
-/* ================= RELEASE PREVIEW ================= */
-
-function buildRelease() {
-  const date = document.getElementById('releaseDate').value;
-  if (!date) {
-    alert('Select release date');
-    return;
-  }
-
-  const d = new Date(date);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-
-  const releaseName = `release/${dd}-${mm}-${yyyy}`;
-
-  const selected = services.filter((_, i) =>
-    document.getElementById(`svc_${i}`).checked
-  );
-
-  const box = document.getElementById('releasePreview');
-  box.style.display = 'block';
-  box.textContent =
-`Release branch:
-${releaseName}
-
-Services:
-${selected.map(s => '- ' + s.repo).join('\n')}
-
-Next step:
-GitHub Actions → Create release branches
-`;
-}
-
-/* ================= DEPLOY STATUS ================= */
+/* ================= DASHBOARD ================= */
 
 async function loadDashboard() {
   const tbody = document.getElementById('services');
