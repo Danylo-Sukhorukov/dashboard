@@ -110,11 +110,6 @@
     </select>
   </label>
 
-  <label>
-    Release date:
-    <input type="date" id="releaseDate" />
-  </label>
-
   <div id="serviceToggles"></div>
 
   <div id="finalString"></div>
@@ -273,7 +268,7 @@ async function compareBranches(repo, base, head) {
       checkbox.checked = true;
       status.textContent = ` +${result.total_commits} commits`;
       
-      servicesWithChanges.push(svc.name); 
+      servicesWithChanges.push(svc.repo); 
     } else {
       status.textContent = ' up to date';
     }
