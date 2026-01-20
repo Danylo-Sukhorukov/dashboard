@@ -1,0 +1,57 @@
+name: Manual backmerge PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Source branch (from)'
+        required: true
+        default: 'prod'
+        type: string
+
+      target_branch:
+        description: 'Target branch (to)'
+        required: true
+        default: 'stage'
+        type: string
+
+      draft:
+        description: 'Create PR as draft'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  backmerge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate branches
+        run: |
+          if [ "${{ inputs.source_branch }}" = "${{ inputs.target_branch }}" ]; then
+            echo "Source and target branches must be different"
+            exit 1
+          fi
+
+      - name: Create backmerge Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.CROSS_REPO_TOKEN }}
+
+          head: ${{ inputs.source_branch }}
+          base: ${{ inputs.target_branch }}
+
+          title: "chore: backmerge ${{ inputs.source_branch }} → ${{ inputs.target_branch }}"
+          body: |
+            Automated backmerge PR
+
+            **From:** `${{ inputs.source_branch }}`
+            **To:** `${{ inputs.target_branch }}`
+
+            Created manually via GitHub Actions.
+
+          labels: |
+            backmerge
+            automated
+
+          draft: ${{ inputs.draft }}
