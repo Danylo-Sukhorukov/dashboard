@@ -68,8 +68,6 @@ jobs:
             echo ""
             echo "▶ Processing $REPO"
 
-            gh repo set-default "$REPO"
-
             COMMITS=$(gh api \
               repos/$REPO/compare/$TARGET...$SOURCE \
               --jq '.total_commits')
