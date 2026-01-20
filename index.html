@@ -26,15 +26,8 @@
       margin: 8px 0;
     }
 
-    select, input[type="date"] {
+    select {
       margin-left: 8px;
-    }
-
-    button {
-      margin-top: 16px;
-      padding: 8px 14px;
-      font-size: 14px;
-      cursor: pointer;
     }
 
     table {
@@ -63,14 +56,9 @@
       margin-left: 6px;
     }
 
-    .box {
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
-      padding: 12px;
-      margin-top: 12px;
-      font-family: monospace;
-      font-size: 13px;
-      white-space: pre;
+    .warn {
+      color: #d1242f;
+      font-weight: 500;
     }
 
     a {
@@ -87,14 +75,14 @@
 
 <h1>Release Dashboard</h1>
 
-<!-- ================= RELEASE CREATOR ================= -->
+<!-- ================= RELEASE ================= -->
 
 <section>
-  <h2>Create release</h2>
+  <h2>Release compare</h2>
 
   <label>
-    From branch:
-    <select id="fromBranch" onchange="onBranchesChanged()">
+    From:
+    <select id="releaseFrom" onchange="onReleaseChanged()">
       <option value="dev">dev</option>
       <option value="test">test</option>
       <option value="stage">stage</option>
@@ -102,40 +90,58 @@
   </label>
 
   <label>
-    To branch:
-    <select id="toBranch" onchange="onBranchesChanged()">
+    To:
+    <select id="releaseTo" onchange="onReleaseChanged()">
       <option value="test">test</option>
       <option value="stage">stage</option>
       <option value="prod">prod</option>
     </select>
   </label>
 
-  <div id="serviceToggles"></div>
-  <div id="finalString" style="margin-top: 12px;"></div>
+  <div id="releaseResult"></div>
+</section>
 
-  <div>
-    Use it here: <a href='https://github.com/Danylo-Sukhorukov/dashboard/actions/workflows/create-pull-requests.yml'>github action</a>
-  </div>
+<!-- ================= BACKMERGE ================= -->
 
-  <div id="backmergeBlock" style="margin-top: 12px;"></div>
+<section>
+  <h2>Backmerge</h2>
+
+  <label>
+    From:
+    <select id="backmergeFrom" onchange="onBackmergeChanged()">
+      <option value="prod">prod</option>
+      <option value="stage">stage</option>
+      <option value="test">test</option>
+    </select>
+  </label>
+
+  <label>
+    To:
+    <select id="backmergeTo" onchange="onBackmergeChanged()">
+      <option value="stage">stage</option>
+      <option value="test">test</option>
+      <option value="dev">dev</option>
+    </select>
+  </label>
+
+  <div id="backmergeResult"></div>
 </section>
 
 <!-- ================= SERVICES TABLE ================= -->
 
 <section>
-  <h2>Deployed services</h2>
+  <h2>Services</h2>
 
   <table>
     <thead>
       <tr>
         <th>Service</th>
-        <th>Deployed branch</th>
-        <th>Pages URL</th>
+        <th>Repo</th>
       </tr>
     </thead>
-    <tbody id="services">
+    <tbody id="servicesTable">
       <tr>
-        <td colspan="3" class="muted">Loading…</td>
+        <td colspan="2" class="muted">Loading…</td>
       </tr>
     </tbody>
   </table>
@@ -145,50 +151,17 @@
 /* ================= STATE ================= */
 
 let services = [];
-let servicesWithChanges = [];
-let servicesNeedingBackmerge = [];
 
 /* ================= INIT ================= */
 
 async function init() {
   services = await fetch('./services.json').then(r => r.json());
-
-  renderToggles();
-  loadDashboard();
-  onBranchesChanged();
+  renderServicesTable();
+  onReleaseChanged();
+  onBackmergeChanged();
 }
 
-/* ================= TOGGLES ================= */
-
-function renderToggles() {
-  const container = document.getElementById('serviceToggles');
-  container.innerHTML = '<strong>Services:</strong>';
-
-  services.forEach((svc, i) => {
-    container.innerHTML += `
-      <label>
-        <input type="checkbox" id="svc_${i}" disabled />
-        ${svc.name}
-        <span id="svc_${i}_status" class="muted"></span>
-      </label>
-    `;
-  });
-}
-
-function renderFinalString() {
-  const container = document.getElementById('finalString');
-
-  if (servicesWithChanges.length === 0) {
-    container.innerHTML =
-      '<strong>Changed services:</strong> none';
-    return;
-  }
-
-  container.innerHTML =
-    `<strong>Changed services:</strong> ${servicesWithChanges.join(', ')}`;
-}
-
-/* ================= COMPARE ================= */
+/* ================= API ================= */
 
 async function compareBranches(repo, base, head) {
   const [owner, name] = repo.split('/');
@@ -197,142 +170,80 @@ async function compareBranches(repo, base, head) {
     `https://api.github.com/repos/${owner}/${name}/compare/${base}...${head}`
   );
 
-  if (!res.ok) {
-    console.error('GitHub compare error:', repo, base, head, await res.text());
-    return { error: true };
-  }
+  if (!res.ok) return { error: true };
 
   return await res.json();
 }
 
-/* ================= BRANCH CHANGE ================= */
+/* ================= RELEASE ================= */
 
-// async function onBranchesChanged() {
-//   const from = document.getElementById('fromBranch').value;
-//   const to = document.getElementById('toBranch').value;
+async function onReleaseChanged() {
+  const from = document.getElementById('releaseFrom').value;
+  const to = document.getElementById('releaseTo').value;
 
-//   servicesWithChanges = [];
-
-//   await Promise.all(
-//     services.map(async (svc, i) => {
-//       const checkbox = document.getElementById(`svc_${i}`);
-//       const status = document.getElementById(`svc_${i}_status`);
-
-//       checkbox.checked = false;
-//       checkbox.disabled = true;
-//       status.textContent = ' checking…';
-
-//       const result = await compareBranches(svc.repo, to, from);
-
-//       if (result.error) {
-//         status.textContent = ' error';
-//         return;
-//       }
-
-//       const filesChanged = result.files?.length || 0;
-
-//       if (filesChanged > 0) {
-//         checkbox.disabled = false;
-//         checkbox.checked = true;
-//         status.textContent = ` ${filesChanged} files changed`;
-//         servicesWithChanges.push(svc.name);
-//       } else {
-//         status.textContent = ' up to date';
-//       }
-//     })
-//   );
-
-//   renderFinalString();
-// }
-
-async function onBranchesChanged() {
-  const from = document.getElementById('fromBranch').value;
-  const to = document.getElementById('toBranch').value;
-
-  servicesWithChanges = [];
-  servicesNeedingBackmerge = [];
+  const changed = [];
 
   await Promise.all(
-    services.map(async (svc, i) => {
-      const checkbox = document.getElementById(`svc_${i}`);
-      const status = document.getElementById(`svc_${i}_status`);
-
-      checkbox.checked = false;
-      checkbox.disabled = true;
-      status.textContent = ' checking…';
-
-      const result = await compareBranches(svc.repo, to, from);
-
-      if (result.error) {
-        status.textContent = ' error';
-        return;
-      }
-
-      const commitsAhead = result.ahead_by || 0;
-
-      if (commitsAhead > 0) {
-        checkbox.disabled = false;
-        checkbox.checked = true;
-
-        status.textContent = ` +${commitsAhead} commits → needs backmerge`;
-
-        servicesWithChanges.push(svc.repo,toLower());
-
-        servicesNeedingBackmerge.push({
-          name: svc.name,
-          repo: svc.repo,
-          commits: commitsAhead
-        });
-      } else {
-        status.textContent = ' up to date';
+    services.map(async svc => {
+      const r = await compareBranches(svc.repo, to, from);
+      if (!r.error && r.ahead_by > 0) {
+        changed.push(`${svc.name} (+${r.ahead_by})`);
       }
     })
   );
 
-  renderFinalString();
-  renderBackmergeBlock();
+  const el = document.getElementById('releaseResult');
+
+  el.innerHTML = changed.length
+    ? `<strong>Release changes:</strong><ul>${changed.map(x => `<li>${x}</li>`).join('')}</ul>`
+    : '<strong>Release changes:</strong> none';
 }
 
-  function renderBackmergeBlock() {
-  const container = document.getElementById('backmergeBlock');
+/* ================= BACKMERGE ================= */
 
-  if (servicesNeedingBackmerge.length === 0) {
-    container.innerHTML =
-      '<strong>Backmerge required:</strong> none 🎉';
-    return;
-  }
+async function onBackmergeChanged() {
+  const from = document.getElementById('backmergeFrom').value;
+  const to = document.getElementById('backmergeTo').value;
 
-  container.innerHTML = `
-    <strong>Backmerge required:</strong>
-    <ul>
-      ${servicesNeedingBackmerge
-        .map(svc => `<li>${svc.name} (${svc.repo})</li>`)
-        .join('')}
-    </ul>
-  `;
+  const needing = [];
+
+  await Promise.all(
+    services.map(async svc => {
+      const r = await compareBranches(svc.repo, to, from);
+      if (!r.error && r.ahead_by > 0) {
+        needing.push({
+          name: svc.name,
+          repo: svc.repo,
+          commits: r.ahead_by
+        });
+      }
+    })
+  );
+
+  const el = document.getElementById('backmergeResult');
+
+  el.innerHTML = needing.length
+    ? `<strong class="warn">Backmerge required:</strong>
+       <ul>${needing.map(s =>
+         `<li>${s.name} <span class="muted">(+${s.commits}, ${s.repo})</span></li>`
+       ).join('')}</ul>`
+    : '<strong>Backmerge required:</strong> none 🎉';
 }
-  
-/* ================= DASHBOARD ================= */
 
-async function loadDashboard() {
-  const tbody = document.getElementById('services');
+/* ================= TABLE ================= */
+
+function renderServicesTable() {
+  const tbody = document.getElementById('servicesTable');
   tbody.innerHTML = '';
 
-  const pages = await fetch('./pages-status.json').then(r => r.json());
-
-  for (const service of services) {
-    const row = document.createElement('tr');
-
-    row.innerHTML = `
-      <td>${service.name}</td>
-      <td>${pages?.source?.branch || '—'}</td>
-      <td>
-        <a href="${pages?.html_url}" target="_blank">open</a>
-      </td>
+  services.forEach(svc => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${svc.name}</td>
+      <td>${svc.repo}</td>
     `;
-
-    tbody.appendChild(row);
-  }
+    tbody.appendChild(tr);
+  });
 }
 
 init();
