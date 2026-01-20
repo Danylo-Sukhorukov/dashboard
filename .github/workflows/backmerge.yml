@@ -1,4 +1,4 @@
-name: Manual backmerge PR
+name: Backmerge PR
 
 on:
   workflow_dispatch:
@@ -15,8 +15,17 @@ on:
         default: 'stage'
         type: string
 
+      repositories:
+        description: |
+          Repositories (one per line, format: owner/repo)
+          Example:
+          my-org/service-a
+          my-org/service-b
+        required: true
+        type: string
+
       draft:
-        description: 'Create PR as draft'
+        description: 'Create PRs as draft'
         required: false
         default: true
         type: boolean
@@ -26,32 +35,75 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate branches
+      - name: Validate input
         run: |
           if [ "${{ inputs.source_branch }}" = "${{ inputs.target_branch }}" ]; then
             echo "Source and target branches must be different"
             exit 1
           fi
 
-      - name: Create backmerge Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: Authenticate gh
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+        run: |
+          gh auth status
 
-          head: ${{ inputs.source_branch }}
-          base: ${{ inputs.target_branch }}
+      - name: Create backmerge PRs
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+        run: |
+          set -e
 
-          title: "chore: backmerge ${{ inputs.source_branch }} → ${{ inputs.target_branch }}"
-          body: |
-            Automated backmerge PR
+          SOURCE="${{ inputs.source_branch }}"
+          TARGET="${{ inputs.target_branch }}"
+          DRAFT="${{ inputs.draft }}"
+          REPOS=$(echo "${{ inputs.repositories }}" | tr -d '\r')
 
-            **From:** `${{ inputs.source_branch }}`
-            **To:** `${{ inputs.target_branch }}`
+          echo "Backmerge: $SOURCE → $TARGET"
+          echo "Repositories:"
+          echo "$REPOS"
+          echo "-------------------------"
 
-            Created manually via GitHub Actions.
+          for REPO in $REPOS; do
+            echo ""
+            echo "▶ Processing $REPO"
 
-          labels: |
-            backmerge
-            automated
+            gh repo set-default "$REPO"
 
-          draft: ${{ inputs.draft }}
+            COMMITS=$(gh api \
+              repos/$REPO/compare/$TARGET...$SOURCE \
+              --jq '.total_commits')
+
+            if [ "$COMMITS" = "0" ]; then
+              echo "No commits to backmerge"
+              continue
+            fi
+
+            EXISTING_PR=$(gh pr list \
+              --repo "$REPO" \
+              --base "$TARGET" \
+              --head "$SOURCE" \
+              --state open \
+              --json number \
+              --jq 'length')
+
+            if [ "$EXISTING_PR" != "0" ]; then
+              echo "PR already exists"
+              continue
+            fi
+
+            gh pr create \
+              --repo "$REPO" \
+              --base "$TARGET" \
+              --head "$SOURCE" \
+              --title "chore: backmerge $SOURCE → $TARGET" \
+              --body "Automated backmerge PR
+
+            From: \`$SOURCE\`
+            To: \`$TARGET\`
+            
+            Created via GitHub Actions." \
+                          $( [ "$DRAFT" = "true" ] && echo "--draft" )
+            
+                        echo "PR created"
+                      done
