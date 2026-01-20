@@ -266,7 +266,7 @@ async function compareBranches(repo, base, head) {
         checkbox.disabled = false;
         checkbox.checked = true;
         status.textContent = ` +${commitsCount} commits`;
-        servicesWithChanges.push(svc.name);
+        servicesWithChanges.push(svc.repo);
       } else {
         status.textContent = ' up to date';
       }
