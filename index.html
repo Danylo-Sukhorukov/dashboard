@@ -200,7 +200,45 @@ async function compareBranches(repo, base, head) {
 
 /* ================= BRANCH CHANGE ================= */
 
-async function onBranchesChanged() {
+// async function onBranchesChanged() {
+//   const from = document.getElementById('fromBranch').value;
+//   const to = document.getElementById('toBranch').value;
+
+//   servicesWithChanges = [];
+
+//   await Promise.all(
+//     services.map(async (svc, i) => {
+//       const checkbox = document.getElementById(`svc_${i}`);
+//       const status = document.getElementById(`svc_${i}_status`);
+
+//       checkbox.checked = false;
+//       checkbox.disabled = true;
+//       status.textContent = ' checking…';
+
+//       const result = await compareBranches(svc.repo, to, from);
+
+//       if (result.error) {
+//         status.textContent = ' error';
+//         return;
+//       }
+
+//       const filesChanged = result.files?.length || 0;
+
+//       if (filesChanged > 0) {
+//         checkbox.disabled = false;
+//         checkbox.checked = true;
+//         status.textContent = ` ${filesChanged} files changed`;
+//         servicesWithChanges.push(svc.name);
+//       } else {
+//         status.textContent = ' up to date';
+//       }
+//     })
+//   );
+
+//   renderFinalString();
+// }
+
+  async function onBranchesChanged() {
   const from = document.getElementById('fromBranch').value;
   const to = document.getElementById('toBranch').value;
 
@@ -222,12 +260,12 @@ async function onBranchesChanged() {
         return;
       }
 
-      const filesChanged = result.files?.length || 0;
+      const commitsCount = result.commits?.length || 0;
 
-      if (filesChanged > 0) {
+      if (commitsCount > 0) {
         checkbox.disabled = false;
         checkbox.checked = true;
-        status.textContent = ` ${filesChanged} files changed`;
+        status.textContent = ` +${commitsCount} commits`;
         servicesWithChanges.push(svc.name);
       } else {
         status.textContent = ' up to date';
