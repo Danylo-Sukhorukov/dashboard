@@ -116,6 +116,8 @@
   <div>
     Use it here: <a href='https://github.com/Danylo-Sukhorukov/dashboard/actions/workflows/create-pull-requests.yml'>github action</a>
   </div>
+
+  <div id="backmergeBlock" style="margin-top: 12px;"></div>
 </section>
 
 <!-- ================= SERVICES TABLE ================= -->
@@ -144,6 +146,7 @@
 
 let services = [];
 let servicesWithChanges = [];
+let servicesNeedingBackmerge = [];
 
 /* ================= INIT ================= */
 
@@ -242,11 +245,12 @@ async function compareBranches(repo, base, head) {
 //   renderFinalString();
 // }
 
-  async function onBranchesChanged() {
+async function onBranchesChanged() {
   const from = document.getElementById('fromBranch').value;
   const to = document.getElementById('toBranch').value;
 
   servicesWithChanges = [];
+  servicesNeedingBackmerge = [];
 
   await Promise.all(
     services.map(async (svc, i) => {
@@ -264,13 +268,21 @@ async function compareBranches(repo, base, head) {
         return;
       }
 
-      const commitsCount = result.commits?.length || 0;
+      const commitsAhead = result.ahead_by || 0;
 
-      if (commitsCount > 0) {
+      if (commitsAhead > 0) {
         checkbox.disabled = false;
         checkbox.checked = true;
-        status.textContent = ` +${commitsCount} commits`;
-        servicesWithChanges.push(svc.repo);
+
+        status.textContent = ` +${commitsAhead} commits → needs backmerge`;
+
+        servicesWithChanges.push(svc.repo,toLower());
+
+        servicesNeedingBackmerge.push({
+          name: svc.name,
+          repo: svc.repo,
+          commits: commitsAhead
+        });
       } else {
         status.textContent = ' up to date';
       }
@@ -278,8 +290,28 @@ async function compareBranches(repo, base, head) {
   );
 
   renderFinalString();
+  renderBackmergeBlock();
 }
 
+  function renderBackmergeBlock() {
+  const container = document.getElementById('backmergeBlock');
+
+  if (servicesNeedingBackmerge.length === 0) {
+    container.innerHTML =
+      '<strong>Backmerge required:</strong> none 🎉';
+    return;
+  }
+
+  container.innerHTML = `
+    <strong>Backmerge required:</strong>
+    <ul>
+      ${servicesNeedingBackmerge
+        .map(svc => `<li>${svc.name} (${svc.repo})</li>`)
+        .join('')}
+    </ul>
+  `;
+}
+  
 /* ================= DASHBOARD ================= */
 
 async function loadDashboard() {
