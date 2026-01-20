@@ -123,7 +123,7 @@ jobs:
             gh pr merge "$PR_NUMBER" \
               --repo "$repo" \
               --auto \
-              --squash \
+              --merge \
               || echo "Auto-merge not possible for $repo (checks/approvals pending)"
           done
 
