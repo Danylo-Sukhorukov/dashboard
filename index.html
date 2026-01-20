@@ -117,14 +117,8 @@
 
   <div id="serviceToggles"></div>
 
-  <button onclick="buildRelease()">Prepare release</button>
+  <div id="finalString"></div>
 
-  <div id="releasePreview" class="box" style="display:none;"></div>
-
-  <p class="muted">
-    ⚠️ Branch creation is done via GitHub Actions (manual run).<br>
-    This UI prepares the release configuration.
-  </p>
 </section>
 
 <!-- ================= SERVICES TABLE ================= -->
@@ -181,6 +175,19 @@ function renderToggles() {
   });
 }
 
+function renderFinalString() {
+  const container = document.getElementById('finalString');
+
+  if (servicesWithChanges.length === 0) {
+    container.innerHTML =
+      '<strong>Changed services:</strong> none';
+    return;
+  }
+
+  container.innerHTML =
+    `<strong>Changed services:</strong> ${servicesWithChanges.join(', ')}`;
+}
+
 /* ================= COMPARE ================= */
 
 async function compareBranches(repo, base, head) {
@@ -197,9 +204,41 @@ async function compareBranches(repo, base, head) {
   return await res.json();
 }
 
-async function onBranchesChanged() {
+// async function onBranchesChanged() {
+//   const from = document.getElementById('fromBranch').value;
+//   const to = document.getElementById('toBranch').value;
+
+//   for (let i = 0; i < services.length; i++) {
+//     const svc = services[i];
+//     const checkbox = document.getElementById(`svc_${i}`);
+//     const status = document.getElementById(`svc_${i}_status`);
+
+//     checkbox.checked = false;
+//     checkbox.disabled = true;
+//     status.textContent = ' checking…';
+
+//     const result = await compareBranches(svc.repo, to, from);
+
+//     if (result.error) {
+//       status.textContent = ' error';
+//       continue;
+//     }
+
+//     if (result.total_commits > 0) {
+//       checkbox.disabled = false;
+//       checkbox.checked = true;
+//       status.textContent = ` +${result.total_commits} commits`;
+//     } else {
+//       status.textContent = ' up to date';
+//     }
+//   }
+// }
+
+  async function onBranchesChanged() {
   const from = document.getElementById('fromBranch').value;
   const to = document.getElementById('toBranch').value;
+
+  servicesWithChanges = [];
 
   for (let i = 0; i < services.length; i++) {
     const svc = services[i];
@@ -217,14 +256,30 @@ async function onBranchesChanged() {
       continue;
     }
 
+    // const hasCodeDiff = result.files && result.files.length > 0;
+
+    // if (hasCodeDiff) {
+    //   checkbox.disabled = false;
+    //   checkbox.checked = true;
+    //   status.textContent = ` code changed`;
+
+    //   servicesWithChanges.push(svc.name); // ← ВАЖНО
+    // } else {
+    //   status.textContent = ' up to date';
+    // }
+
     if (result.total_commits > 0) {
       checkbox.disabled = false;
       checkbox.checked = true;
       status.textContent = ` +${result.total_commits} commits`;
+      
+      servicesWithChanges.push(svc.name); 
     } else {
       status.textContent = ' up to date';
     }
   }
+
+  renderFinalString();
 }
 
 /* ================= RELEASE PREVIEW ================= */
