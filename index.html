@@ -61,13 +61,14 @@
       font-weight: 500;
     }
 
-    a {
-      color: #0969da;
-      text-decoration: none;
-    }
-
-    a:hover {
-      text-decoration: underline;
+    .copyline {
+      margin-top: 8px;
+      padding: 8px;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      font-family: monospace;
+      font-size: 13px;
+      word-break: break-all;
     }
   </style>
 </head>
@@ -99,6 +100,7 @@
   </label>
 
   <div id="releaseResult"></div>
+  <div id="releaseCopy" class="copyline"></div>
 </section>
 
 <!-- ================= BACKMERGE ================= -->
@@ -125,9 +127,10 @@
   </label>
 
   <div id="backmergeResult"></div>
+  <div id="backmergeCopy" class="copyline"></div>
 </section>
 
-<!-- ================= SERVICES TABLE ================= -->
+<!-- ================= SERVICES ================= -->
 
 <section>
   <h2>Services</h2>
@@ -182,21 +185,25 @@ async function onReleaseChanged() {
   const to = document.getElementById('releaseTo').value;
 
   const changed = [];
+  const repos = [];
 
   await Promise.all(
     services.map(async svc => {
       const r = await compareBranches(svc.repo, to, from);
       if (!r.error && r.ahead_by > 0) {
         changed.push(`${svc.name} (+${r.ahead_by})`);
+        repos.push(svc.repo.toLowerCase());
       }
     })
   );
 
-  const el = document.getElementById('releaseResult');
+  document.getElementById('releaseResult').innerHTML =
+    changed.length
+      ? `<strong>Release required:</strong><ul>${changed.map(x => `<li>${x}</li>`).join('')}</ul>`
+      : '<strong>Release required:</strong> none';
 
-  el.innerHTML = changed.length
-    ? `<strong>Release changes:</strong><ul>${changed.map(x => `<li>${x}</li>`).join('')}</ul>`
-    : '<strong>Release changes:</strong> none';
+  document.getElementById('releaseCopy').textContent =
+    repos.length ? repos.join(',') : '';
 }
 
 /* ================= BACKMERGE ================= */
@@ -206,28 +213,25 @@ async function onBackmergeChanged() {
   const to = document.getElementById('backmergeTo').value;
 
   const needing = [];
+  const repos = [];
 
   await Promise.all(
     services.map(async svc => {
       const r = await compareBranches(svc.repo, to, from);
       if (!r.error && r.ahead_by > 0) {
-        needing.push({
-          name: svc.name,
-          repo: svc.repo,
-          commits: r.ahead_by
-        });
+        needing.push(`${svc.name} (+${r.ahead_by})`);
+        repos.push(svc.repo.toLowerCase());
       }
     })
   );
 
-  const el = document.getElementById('backmergeResult');
+  document.getElementById('backmergeResult').innerHTML =
+    needing.length
+      ? `<strong class="warn">Backmerge required:</strong><ul>${needing.map(x => `<li>${x}</li>`).join('')}</ul>`
+      : '<strong>Backmerge required:</strong> none 🎉';
 
-  el.innerHTML = needing.length
-    ? `<strong class="warn">Backmerge required:</strong>
-       <ul>${needing.map(s =>
-         `<li>${s.name} <span class="muted">(+${s.commits}, ${s.repo})</span></li>`
-       ).join('')}</ul>`
-    : '<strong>Backmerge required:</strong> none 🎉';
+  document.getElementById('backmergeCopy').textContent =
+    repos.length ? repos.join(',') : '';
 }
 
 /* ================= TABLE ================= */
