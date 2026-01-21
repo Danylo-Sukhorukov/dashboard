@@ -1,0 +1,110 @@
+name: Multi-repo Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Source branch (e.g. dev)"
+        required: true
+        default: "dev"
+      to:
+        description: "Target branch (e.g. test)"
+        required: true
+        default: "test"
+      mode:
+        description: "Execution mode"
+        required: true
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  compare:
+    name: Compare branches
+    runs-on: ubuntu-latest
+
+    outputs:
+      affected: ${{ steps.collect.outputs.affected }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install gh
+        uses: cli/cli@v2
+
+      - name: Compare repositories
+        id: collect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[]" > affected.json
+
+          for row in $(jq -c '.[]' services.json); do
+            name=$(echo "$row" | jq -r '.name')
+            repo=$(echo "$row" | jq -r '.repo')
+
+            echo "🔍 $repo"
+
+            ahead=$(gh api repos/$repo/compare/${{ inputs.to }}...${{ inputs.from }} \
+              --jq '.ahead_by' 2>/dev/null || echo "0")
+
+            if [ "$ahead" -gt 0 ]; then
+              echo "  ➜ needs release (+$ahead)"
+              jq ". + [{\"name\":\"$name\",\"repo\":\"$repo\",\"ahead\":$ahead}]" \
+                affected.json > tmp.json && mv tmp.json affected.json
+            fi
+          done
+
+          echo "affected=$(cat affected.json | jq -c .)" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Release comparison" >> $GITHUB_STEP_SUMMARY
+          echo "**From:** \`${{ inputs.from }}\` → **To:** \`${{ inputs.to }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$(jq length affected.json)" -eq 0 ]; then
+            echo "✅ No repositories require release" >> $GITHUB_STEP_SUMMARY
+          else
+            jq -r '.[] | "- **\(.name)** (`\(.repo)`) +\(.ahead)"' affected.json \
+              >> $GITHUB_STEP_SUMMARY
+          fi
+
+  apply:
+    name: Create release PRs
+    needs: compare
+    if: inputs.mode == 'apply' && needs.compare.outputs.affected != '[]'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: release-approval
+
+    steps:
+      - name: Install gh
+        uses: cli/cli@v2
+
+      - name: Create PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AFFECTED: ${{ needs.compare.outputs.affected }}
+        run: |
+          echo "$AFFECTED" | jq -c '.[]' | while read svc; do
+            repo=$(echo "$svc" | jq -r '.repo')
+            name=$(echo "$svc" | jq -r '.name')
+
+            echo "🚀 Creating PR for $repo"
+
+            gh pr create \
+              --repo "$repo" \
+              --base "${{ inputs.to }}" \
+              --head "${{ inputs.from }}" \
+              --title "Release ${{ inputs.from }} → ${{ inputs.to }}" \
+              --body "Automated release PR for **$name**" \
+              || echo "PR already exists or failed"
+          done
