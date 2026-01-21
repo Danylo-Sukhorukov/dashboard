@@ -35,13 +35,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install gh
-        uses: cli/cli@v2
+      - name: Setup GitHub CLI
+        uses: actions/setup-gh@v1
 
       - name: Compare repositories
         id: collect
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
         run: |
           echo "[]" > affected.json
 
@@ -91,7 +91,7 @@ jobs:
 
       - name: Create PRs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
           AFFECTED: ${{ needs.compare.outputs.affected }}
         run: |
           echo "$AFFECTED" | jq -c '.[]' | while read svc; do
