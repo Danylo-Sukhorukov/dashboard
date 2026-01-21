@@ -38,7 +38,7 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y gh
+          sudo apt-get install -y gh jq
 
       - name: Compare repositories
         id: collect
@@ -57,17 +57,16 @@ jobs:
               --jq '.ahead_by' 2>/dev/null || echo "0")
 
             if [ "$ahead" -gt 0 ]; then
-              echo "  ➜ needs release (+$ahead)"
               jq ". + [{\"name\":\"$name\",\"repo\":\"$repo\",\"ahead\":$ahead}]" \
                 affected.json > tmp.json && mv tmp.json affected.json
             fi
           done
 
-          echo "affected=$(cat affected.json | jq -c .)" >> $GITHUB_OUTPUT
+          echo "affected=$(jq -c . affected.json)" >> $GITHUB_OUTPUT
 
       - name: Summary
         run: |
-          echo "## Release comparison" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 Release comparison" >> $GITHUB_STEP_SUMMARY
           echo "**From:** \`${{ inputs.from }}\` → **To:** \`${{ inputs.to }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -91,24 +90,46 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y gh
+          sudo apt-get install -y gh jq
 
       - name: Create PRs
+        id: create_prs
         env:
           GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
           AFFECTED: ${{ needs.compare.outputs.affected }}
         run: |
+          echo "[]" > prs.json
+
           echo "$AFFECTED" | jq -c '.[]' | while read svc; do
             repo=$(echo "$svc" | jq -r '.repo')
             name=$(echo "$svc" | jq -r '.name')
 
             echo "Creating PR for $repo"
 
-            gh pr create \
+            pr_url=$(gh pr create \
               --repo "$repo" \
               --base "${{ inputs.to }}" \
               --head "${{ inputs.from }}" \
               --title "Release ${{ inputs.from }} → ${{ inputs.to }}" \
               --body "Automated release PR for **$name**" \
-              || echo "PR already exists or failed"
+              --json url \
+              --jq '.url' \
+              2>/dev/null || true)
+
+            if [ -n "$pr_url" ]; then
+              jq ". + [{\"name\":\"$name\",\"repo\":\"$repo\",\"url\":\"$pr_url\"}]" \
+                prs.json > tmp.json && mv tmp.json prs.json
+            fi
           done
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Release PRs created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$(jq length prs.json)" -eq 0 ]; then
+            echo "No PRs were created" >> $GITHUB_STEP_SUMMARY
+          else
+            jq -r '.[] | "- **\(.name)** (`\(.repo)`) → [PR link](\(.url))"' prs.json \
+              >> $GITHUB_STEP_SUMMARY
+          fi
