@@ -51,7 +51,7 @@ jobs:
             name=$(echo "$row" | jq -r '.name')
             repo=$(echo "$row" | jq -r '.repo')
 
-            echo "🔍 $repo"
+            echo "$repo"
 
             ahead=$(gh api repos/$repo/compare/${{ inputs.to }}...${{ inputs.from }} \
               --jq '.ahead_by' 2>/dev/null || echo "0")
@@ -66,7 +66,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## 🔍 Release comparison" >> $GITHUB_STEP_SUMMARY
+          echo "##Release comparison" >> $GITHUB_STEP_SUMMARY
           echo "**From:** \`${{ inputs.from }}\` → **To:** \`${{ inputs.to }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -103,7 +103,7 @@ jobs:
             repo=$(echo "$svc" | jq -r '.repo')
             name=$(echo "$svc" | jq -r '.name')
 
-            echo "🚀 Creating PR for $repo"
+            echo "Creating PR for $repo"
 
             output=$(gh pr create \
               --repo "$repo" \
@@ -125,7 +125,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## 🚀 Release PRs created" >> $GITHUB_STEP_SUMMARY
+          echo "## Release PRs created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "$(jq length prs.json)" -eq 0 ]; then
