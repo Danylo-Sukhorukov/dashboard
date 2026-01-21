@@ -72,7 +72,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "$(jq length affected.json)" -eq 0 ]; then
-            echo "✅ No repositories require release" >> $GITHUB_STEP_SUMMARY
+            echo "No repositories require release" >> $GITHUB_STEP_SUMMARY
           else
             jq -r '.[] | "- **\(.name)** (`\(.repo)`) +\(.ahead)"' affected.json \
               >> $GITHUB_STEP_SUMMARY
@@ -88,8 +88,10 @@ jobs:
       name: release-approval
 
     steps:
-      - name: Install gh
-        uses: cli/cli@v2
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
 
       - name: Create PRs
         env:
@@ -100,7 +102,7 @@ jobs:
             repo=$(echo "$svc" | jq -r '.repo')
             name=$(echo "$svc" | jq -r '.name')
 
-            echo "🚀 Creating PR for $repo"
+            echo "Creating PR for $repo"
 
             gh pr create \
               --repo "$repo" \
