@@ -99,13 +99,13 @@ jobs:
           AFFECTED: ${{ needs.compare.outputs.affected }}
         run: |
           echo "[]" > prs.json
-
-          echo "$AFFECTED" | jq -c '.[]' | while read svc; do
+      
+          for svc in $(echo "$AFFECTED" | jq -c '.[]'); do
             repo=$(echo "$svc" | jq -r '.repo')
             name=$(echo "$svc" | jq -r '.name')
-
+      
             echo "Creating PR for $repo"
-
+      
             pr_url=$(gh pr create \
               --repo "$repo" \
               --base "${{ inputs.to }}" \
@@ -114,8 +114,8 @@ jobs:
               --body "Automated release PR for **$name**" \
               --json url \
               --jq '.url' \
-              2>/dev/null || true)
-
+              || true)
+      
             if [ -n "$pr_url" ]; then
               jq ". + [{\"name\":\"$name\",\"repo\":\"$repo\",\"url\":\"$pr_url\"}]" \
                 prs.json > tmp.json && mv tmp.json prs.json
