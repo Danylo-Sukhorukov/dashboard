@@ -93,29 +93,30 @@ jobs:
           sudo apt-get install -y gh jq
 
       - name: Create PRs
-        id: create_prs
         env:
           GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
           AFFECTED: ${{ needs.compare.outputs.affected }}
         run: |
           echo "[]" > prs.json
-      
+
           for svc in $(echo "$AFFECTED" | jq -c '.[]'); do
             repo=$(echo "$svc" | jq -r '.repo')
             name=$(echo "$svc" | jq -r '.name')
-      
-            echo "Creating PR for $repo"
-      
-            pr_url=$(gh pr create \
+
+            echo "🚀 Creating PR for $repo"
+
+            output=$(gh pr create \
               --repo "$repo" \
               --base "${{ inputs.to }}" \
               --head "${{ inputs.from }}" \
               --title "Release ${{ inputs.from }} → ${{ inputs.to }}" \
               --body "Automated release PR for **$name**" \
-              --json url \
-              --jq '.url' \
-              || true)
-      
+              2>&1)
+
+            echo "$output"
+
+            pr_url=$(echo "$output" | grep -Eo 'https://github.com[^ ]+')
+
             if [ -n "$pr_url" ]; then
               jq ". + [{\"name\":\"$name\",\"repo\":\"$repo\",\"url\":\"$pr_url\"}]" \
                 prs.json > tmp.json && mv tmp.json prs.json
