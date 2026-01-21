@@ -35,8 +35,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup GitHub CLI
-        uses: actions/setup-gh@v1
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
 
       - name: Compare repositories
         id: collect
